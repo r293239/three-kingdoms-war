@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Three Kingdoms War - Week 1</title>
+  <title>Three Kingdoms War - Week 2</title>
   <style>
     body {
       margin: 0;
@@ -59,10 +59,19 @@
     label {
       font-weight: normal;
     }
+    input[type=number] {
+      width: 60px;
+      margin-left: 5px;
+      background: #333;
+      border: 1px solid #555;
+      color: #eee;
+      padding: 2px 4px;
+      border-radius: 3px;
+    }
   </style>
 </head>
 <body>
-  <h1>Three Kingdoms War - Week 1</h1>
+  <h1>Three Kingdoms War - Week 2</h1>
   <canvas id="gameCanvas" width="500" height="500"></canvas>
   <div id="infoBar">
     <div>Turn: <span id="turnNumber">1</span></div>
@@ -70,11 +79,10 @@
     <button id="endTurnBtn">End Turn</button>
   </div>
   <div id="sidePanel">
-    <h2>City Information</h2>
-    <div id="cityInfo">Click on your city to see details.</div>
+    <h2>City Management</h2>
+    <div id="cityInfo">Click your city to manage armies and training.</div>
   </div>
 
   <script src="game.js"></script>
 </body>
 </html>
-
