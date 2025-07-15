@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Three Kingdoms War</title>
+<style>
+  body { margin: 0; font-family: sans-serif; background: #111; color: #eee; }
+  #gameCanvas { background: #222; display: block; margin: 10px auto; border: 1px solid #555; cursor: pointer; }
+  #info { text-align: center; margin-top: 10px; }
+  #controls { max-width: 500px; margin: 10px auto; text-align: center; }
+  button { margin: 5px; padding: 8px 12px; font-weight: bold; cursor: pointer; }
+  #title { font-size: 1.5em; margin: 15px 0 5px; text-align: center; }
+</style>
+</head>
+<body>
+
+  <div id="title">Three Kingdoms War</div>
+  <canvas id="gameCanvas" width="500" height="500"></canvas>
+  <div id="info">Use WASD or arrow keys to move viewport. Click neutral tiles adjacent to your territory to capture (1 AP each).</div>
+  <div id="controls">
+    <button id="endTurnBtn">End Turn</button>
+    <span id="turnInfo">Turn: 1</span>
+    <span id="apInfo" style="margin-left: 20px;">AP: 3</span>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>
