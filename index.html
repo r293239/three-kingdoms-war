@@ -3,39 +3,49 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Three Kingdoms War</title>
+  <title>Three Kingdoms War - Week 1</title>
   <style>
     body {
       margin: 0;
       font-family: sans-serif;
-      background: #111;
+      background: #121212;
       color: #eee;
       display: flex;
       flex-direction: column;
       align-items: center;
+      user-select: none;
     }
     #gameCanvas {
       background: #222;
-      border: 1px solid #555;
+      border: 2px solid #444;
       cursor: pointer;
+      image-rendering: pixelated;
     }
-    #info {
-      margin: 10px;
+    #infoBar {
+      margin-top: 8px;
       max-width: 520px;
-      text-align: center;
-    }
-    #controls {
       display: flex;
-      justify-content: center;
-      gap: 10px;
-      margin-bottom: 10px;
-      max-width: 520px;
-      width: 100%;
+      justify-content: space-between;
+      font-weight: bold;
+      font-size: 1.1em;
+    }
+    #sidePanel {
+      background: #222;
+      border: 2px solid #444;
+      margin-top: 12px;
+      padding: 10px;
+      width: 520px;
+      height: 280px;
+      overflow-y: auto;
+      border-radius: 6px;
+    }
+    h1 {
+      margin: 12px 0 6px;
     }
     button {
       background: #4caf50;
       border: none;
-      padding: 8px 12px;
+      padding: 8px 14px;
       color: white;
       font-weight: bold;
       cursor: pointer;
@@ -46,49 +56,25 @@
       background: #666;
       cursor: default;
     }
-    #sidePanel {
-      background: #222;
-      border: 1px solid #444;
-      padding: 10px;
-      width: 500px;
-      max-height: 400px;
-      overflow-y: auto;
-      margin-top: 10px;
-      border-radius: 6px;
-    }
-    h2 {
-      margin: 0 0 10px 0;
-    }
-    .city-info {
-      margin-bottom: 15px;
-      border-bottom: 1px solid #444;
-      padding-bottom: 10px;
-    }
     label {
-      display: block;
-      margin-top: 5px;
-    }
-    input[type=number] {
-      width: 60px;
-      margin-left: 5px;
+      font-weight: normal;
     }
   </style>
 </head>
 <body>
-  <h1>Three Kingdoms War</h1>
+  <h1>Three Kingdoms War - Week 1</h1>
   <canvas id="gameCanvas" width="500" height="500"></canvas>
-  <div id="info">Use WASD / arrow keys to move the map. Click on your city to manage it.</div>
-  <div id="controls">
+  <div id="infoBar">
+    <div>Turn: <span id="turnNumber">1</span></div>
+    <div>Gold: <span id="goldAmount">100</span></div>
     <button id="endTurnBtn">End Turn</button>
-    <span id="turnInfo">Turn: 1</span>
-    <span id="goldInfo" style="margin-left: 20px;">Gold: 100</span>
   </div>
-
   <div id="sidePanel">
-    <h2>City Info</h2>
-    <div id="cityDetails">Select your city on the map to manage it.</div>
+    <h2>City Information</h2>
+    <div id="cityInfo">Click on your city to see details.</div>
   </div>
 
   <script src="game.js"></script>
 </body>
 </html>
+
