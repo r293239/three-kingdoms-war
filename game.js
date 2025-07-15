@@ -1,138 +1,121 @@
 // Constants
 const MAP_SIZE = 100;
-const TILE_SIZE = 25;
-const VIEW_SIZE = 20;
+const TILE_SIZE = 25; 
+const VIEW_SIZE = 20; 
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
+const turnNumberElem = document.getElementById('turnNumber');
+const goldAmountElem = document.getElementById('goldAmount');
 const endTurnBtn = document.getElementById('endTurnBtn');
-const turnInfo = document.getElementById('turnInfo');
-const goldInfo = document.getElementById('goldInfo');
-const cityDetails = document.getElementById('cityDetails');
+const cityInfoElem = document.getElementById('cityInfo');
 
-// Tile types:
+// Tile types
 const TILE_NEUTRAL = 0;
 const TILE_PLAYER_CITY = 1;
 const TILE_PLAYER_CAPITAL = 2;
-const TILE_NEUTRAL_CITY = 3;
-const TILE_ENEMY_CAPITAL = 4;
 
-// Map & Game State
+// Map data structure: 2D array of tiles { type, cityData }
 let map = [];
-for (let i=0; i<MAP_SIZE; i++) {
+for(let y=0; y<MAP_SIZE; y++) {
   let row = [];
-  for(let j=0; j<MAP_SIZE; j++) row.push({ type: TILE_NEUTRAL, city: null });
+  for(let x=0; x<MAP_SIZE; x++) {
+    row.push({ type: TILE_NEUTRAL, cityData: null });
+  }
   map.push(row);
 }
 
-// Player capital and cities setup
-const startX = Math.floor(MAP_SIZE / 2);
-const startY = Math.floor(MAP_SIZE / 2);
-
-map[startY][startX].type = TILE_PLAYER_CAPITAL;
-map[startY][startX].city = {
-  name: 'Capital',
-  gold: 100,
-  armies: 20,
-  buildingBarracks: true,
-  trainingQueue: 0
+// Initialize player capital near center
+const capitalX = Math.floor(MAP_SIZE/2);
+const capitalY = Math.floor(MAP_SIZE/2);
+map[capitalY][capitalX] = {
+  type: TILE_PLAYER_CAPITAL,
+  cityData: {
+    name: 'Capital',
+    gold: 100,
+    armies: 20,
+    barracks: true
+  }
 };
 
+// Create 3 nearby cities
 const nearbyCities = [
-  [startX+1, startY],
-  [startX, startY+1],
-  [startX-1, startY],
+  [capitalX+2, capitalY],
+  [capitalX, capitalY+2],
+  [capitalX-2, capitalY-1],
 ];
-nearbyCities.forEach(([x,y],i) => {
+
+nearbyCities.forEach(([x,y], i) => {
   if(x >= 0 && x < MAP_SIZE && y >= 0 && y < MAP_SIZE) {
-    map[y][x].type = TILE_PLAYER_CITY;
-    map[y][x].city = {
-      name: `City ${i+1}`,
-      gold: 50,
-      armies: 10,
-      buildingBarracks: true,
-      trainingQueue: 0
+    map[y][x] = {
+      type: TILE_PLAYER_CITY,
+      cityData: {
+        name: `City ${i+1}`,
+        gold: 50,
+        armies: 10,
+        barracks: true
+      }
     };
   }
 });
 
-let viewX = startX - Math.floor(VIEW_SIZE/2);
-let viewY = startY - Math.floor(VIEW_SIZE/2);
+// Viewport start position
+let viewX = capitalX - Math.floor(VIEW_SIZE/2);
+let viewY = capitalY - Math.floor(VIEW_SIZE/2);
 
 function clampViewport() {
   viewX = Math.max(0, Math.min(viewX, MAP_SIZE - VIEW_SIZE));
   viewY = Math.max(0, Math.min(viewY, MAP_SIZE - VIEW_SIZE));
 }
-
 clampViewport();
 
-let turn = 1;
-let playerGold = 100;
+// Player global gold tracker (sum of city golds)
+function calculatePlayerGold() {
+  let totalGold = 0;
+  for(let y=0; y<MAP_SIZE; y++) {
+    for(let x=0; x<MAP_SIZE; x++) {
+      let tile = map[y][x];
+      if(tile.cityData) totalGold += tile.cityData.gold;
+    }
+  }
+  return totalGold;
+}
 
-// Army marching structure
-// Each army group marching is:
-// { from: [x,y], to: [x,y], currentPos: [x,y], units: number, moving: true/false }
-
-let marchingArmies = [];
-
+// Draw the visible map area
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-
   for(let y=0; y<VIEW_SIZE; y++) {
     for(let x=0; x<VIEW_SIZE; x++) {
       let mapX = viewX + x;
       let mapY = viewY + y;
       let tile = map[mapY][mapX];
 
-      let color = '#444';
-      switch(tile.type) {
-        case TILE_NEUTRAL: color = '#444'; break;
-        case TILE_PLAYER_CITY: color = '#4caf50'; break;
-        case TILE_PLAYER_CAPITAL: color = '#2e7d32'; break;
-        case TILE_NEUTRAL_CITY: color = '#888'; break;
-        case TILE_ENEMY_CAPITAL: color = '#b71c1c'; break;
-      }
+      // Tile colors
+      let color = '#444'; // neutral land
+      if(tile.type === TILE_PLAYER_CAPITAL) color = '#1e7d32'; // dark green
+      else if(tile.type === TILE_PLAYER_CITY) color = '#4caf50'; // lighter green
 
       ctx.fillStyle = color;
       ctx.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
 
-      // Draw city armies count
-      if(tile.city) {
+      // Draw armies count on city tiles
+      if(tile.cityData) {
         ctx.fillStyle = '#fff';
-        ctx.font = 'bold 12px sans-serif';
+        ctx.font = 'bold 14px monospace';
         ctx.textAlign = 'center';
-        ctx.fillText(tile.city.armies, x * TILE_SIZE + TILE_SIZE/2, y * TILE_SIZE + TILE_SIZE - 5);
+        ctx.fillText(tile.cityData.armies, x * TILE_SIZE + TILE_SIZE/2, y * TILE_SIZE + TILE_SIZE - 6);
       }
 
+      // Draw tile border
       ctx.strokeStyle = '#222';
       ctx.strokeRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
     }
   }
-
-  // Draw marching armies on visible map
-  marchingArmies.forEach(army => {
-    let [mx, my] = army.currentPos;
-    if(mx >= viewX && mx < viewX + VIEW_SIZE && my >= viewY && my < viewY + VIEW_SIZE) {
-      let drawX = (mx - viewX) * TILE_SIZE + TILE_SIZE/2;
-      let drawY = (my - viewY) * TILE_SIZE + TILE_SIZE/2;
-
-      ctx.fillStyle = 'deepskyblue';
-      ctx.beginPath();
-      ctx.arc(drawX, drawY, TILE_SIZE/3, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.fillStyle = '#000';
-      ctx.font = 'bold 14px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(army.units, drawX, drawY);
-    }
-  });
 }
-
 draw();
 
+// Handle viewport movement by arrow keys / WASD
 window.addEventListener('keydown', e => {
   switch(e.key) {
     case 'ArrowUp':
@@ -160,9 +143,10 @@ window.addEventListener('keydown', e => {
   draw();
 });
 
+// Track selected city coords
 let selectedCityCoords = null;
-let selectedArmySendCount = 0;
 
+// Handle clicks on map tiles for city selection
 canvas.addEventListener('click', e => {
   const rect = canvas.getBoundingClientRect();
   const clickX = e.clientX - rect.left;
@@ -174,164 +158,52 @@ canvas.addEventListener('click', e => {
   const mapX = viewX + tileX;
   const mapY = viewY + tileY;
 
-  if(mapY < 0 || mapY >= MAP_SIZE || mapX < 0 || mapX >= MAP_SIZE) return;
+  if(mapX < 0 || mapX >= MAP_SIZE || mapY < 0 || mapY >= MAP_SIZE) return;
 
-  let tile = map[mapY][mapX];
-
-  // Select player's city
-  if(tile.city && (tile.type === TILE_PLAYER_CITY || tile.type === TILE_PLAYER_CAPITAL)) {
+  const tile = map[mapY][mapX];
+  if(tile.cityData) {
     selectedCityCoords = [mapX, mapY];
-    showCityDetails(tile.city);
-  } else if(selectedCityCoords) {
-    // Try to send armies from selected city to clicked tile if city owned
-    let [sx, sy] = selectedCityCoords;
-    let sourceTile = map[sy][sx];
-    if(sourceTile.city && sourceTile.city.armies > 0) {
-      // Check if clicked tile is city owned by player or neutral city to march to
-      if((tile.type === TILE_PLAYER_CITY || tile.type === TILE_PLAYER_CAPITAL || tile.type === TILE_NEUTRAL_CITY) && (mapY !== sy || mapX !== sx)) {
-        if(selectedArmySendCount <= 0) {
-          alert('Enter soldiers to send in city panel first.');
-          return;
-        }
-        if(selectedArmySendCount > sourceTile.city.armies) {
-          alert('Not enough armies in source city.');
-          return;
-        }
-        // Create marching army
-        marchingArmies.push({
-          from: [sx, sy],
-          to: [mapX, mapY],
-          currentPos: [sx, sy],
-          units: selectedArmySendCount,
-          moving: true
-        });
-        sourceTile.city.armies -= selectedArmySendCount;
-        selectedArmySendCount = 0;
-        showCityDetails(sourceTile.city);
-        draw();
-      }
-    }
+    showCityInfo(tile.cityData);
+  } else {
+    selectedCityCoords = null;
+    cityInfoElem.textContent = 'Click on your city to see details.';
   }
 });
 
-function showCityDetails(city) {
-  cityDetails.innerHTML = `
-    <div class="city-info">
-      <strong>${city.name}</strong><br>
-      Gold: ${city.gold}<br>
-      Armies: ${city.armies}<br>
-      Barracks: ${city.buildingBarracks ? 'Built' : 'None'}<br>
-      <label>Train Soldiers (10 gold each): 
-        <input id="trainCount" type="number" min="0" max="${city.gold}" value="0" />
-      </label>
-      <button id="trainBtn">Train</button>
-      <hr>
-      <label>Send Soldiers:
-        <input id="sendCount" type="number" min="0" max="${city.armies}" value="0" />
-      </label>
-      <p>Click on a destination city tile on the map to send the selected soldiers marching.</p>
-    </div>
+// Show info of selected city in side panel
+function showCityInfo(city) {
+  cityInfoElem.innerHTML = `
+    <strong>${city.name}</strong><br>
+    Gold: ${city.gold}<br>
+    Armies: ${city.armies}<br>
+    Barracks: ${city.barracks ? 'Built' : 'None'}
   `;
-
-  const trainBtn = document.getElementById('trainBtn');
-  const trainCountInput = document.getElementById('trainCount');
-  const sendCountInput = document.getElementById('sendCount');
-
-  trainBtn.addEventListener('click', () => {
-    const count = parseInt(trainCountInput.value);
-    if(isNaN(count) || count <= 0) {
-      alert('Enter a valid number of soldiers to train.');
-      return;
-    }
-    const cost = count * 10;
-    if(cost > city.gold) {
-      alert('Not enough gold.');
-      return;
-    }
-    city.gold -= cost;
-    city.armies += count;
-    cityDetails.querySelector('div.city-info').remove();
-    showCityDetails(city);
-    draw();
-  });
-
-  sendCountInput.addEventListener('input', () => {
-    let val = parseInt(sendCountInput.value);
-    if(isNaN(val) || val < 0) val = 0;
-    if(val > city.armies) val = city.armies;
-    selectedArmySendCount = val;
-    sendCountInput.value = val;
-  });
 }
 
-// Move armies one tile closer to their target
-function moveArmies() {
-  marchingArmies.forEach((army, index) => {
-    if(!army.moving) return;
-
-    let [cx, cy] = army.currentPos;
-    let [tx, ty] = army.to;
-
-    if(cx === tx && cy === ty) {
-      // Arrived
-      // Merge with city armies if city belongs to player
-      let tile = map[ty][tx];
-      if(tile.city && (tile.type === TILE_PLAYER_CITY || tile.type === TILE_PLAYER_CAPITAL)) {
-        tile.city.armies += army.units;
-      } else if(tile.type === TILE_NEUTRAL_CITY) {
-        // Capture neutral city and set as player city
-        tile.type = TILE_PLAYER_CITY;
-        tile.city = {
-          name: `City ${tx},${ty}`,
-          gold: 50,
-          armies: army.units,
-          buildingBarracks: true,
-          trainingQueue: 0
-        };
-      }
-      // Remove marching army
-      marchingArmies.splice(index, 1);
-      return;
-    }
-
-    // Calculate next step toward target
-    let dx = tx - cx;
-    let dy = ty - cy;
-    if(Math.abs(dx) > Math.abs(dy)) {
-      cx += dx > 0 ? 1 : -1;
-    } else if(dy !== 0) {
-      cy += dy > 0 ? 1 : -1;
-    }
-
-    army.currentPos = [cx, cy];
-  });
-}
-
+// End Turn handler
 endTurnBtn.addEventListener('click', () => {
-  turn++;
-  turnInfo.textContent = `Turn: ${turn}`;
+  // Increase turn count
+  let turnNum = parseInt(turnNumberElem.textContent);
+  turnNum++;
+  turnNumberElem.textContent = turnNum;
 
-  // Gain gold from cities
-  let totalGoldGain = 0;
+  // Gold income per city +10 gold
   for(let y=0; y<MAP_SIZE; y++) {
     for(let x=0; x<MAP_SIZE; x++) {
       let tile = map[y][x];
-      if(tile.city && (tile.type === TILE_PLAYER_CITY || tile.type === TILE_PLAYER_CAPITAL)) {
-        tile.city.gold += 10;
-        totalGoldGain += 10;
+      if(tile.cityData) {
+        tile.cityData.gold += 10;
       }
     }
   }
-  goldInfo.textContent = `Gold: +${totalGoldGain}`;
 
-  // Move marching armies
-  moveArmies();
+  // Update gold display
+  goldAmountElem.textContent = calculatePlayerGold();
 
+  // Redraw map and update city info if selected
   draw();
-
-  // Update selected city panel if city still selected
   if(selectedCityCoords) {
-    let [sx, sy] = selectedCityCoords;
-    showCityDetails(map[sy][sx].city);
+    let [x,y] = selectedCityCoords;
+    showCityInfo(map[y][x].cityData);
   }
 });
