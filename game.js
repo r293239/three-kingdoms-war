@@ -1,60 +1,114 @@
+// Constants
 const MAP_SIZE = 100;
 const TILE_SIZE = 25;
-const VIEW_SIZE = 20; // viewport 20x20 tiles
+const VIEW_SIZE = 20;
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
 const endTurnBtn = document.getElementById('endTurnBtn');
 const turnInfo = document.getElementById('turnInfo');
-const apInfo = document.getElementById('apInfo');
+const goldInfo = document.getElementById('goldInfo');
+const cityDetails = document.getElementById('cityDetails');
 
-// Tile states:
-// 0 = neutral/unowned
-// 1 = player owned
-// 2 = enemy owned (for future expansion)
-let map = new Array(MAP_SIZE);
-for(let i=0; i<MAP_SIZE; i++) {
-  map[i] = new Array(MAP_SIZE).fill(0);
+// Tile types:
+// 0 = neutral land
+// 1 = player city
+// 2 = player capital
+// 3 = neutral city (not owned)
+// 4 = enemy capital (future)
+const TILE_NEUTRAL = 0;
+const TILE_PLAYER_CITY = 1;
+const TILE_PLAYER_CAPITAL = 2;
+const TILE_NEUTRAL_CITY = 3;
+const TILE_ENEMY_CAPITAL = 4;
+
+// Game State
+let map = [];
+for (let i=0; i<MAP_SIZE; i++) {
+  let row = [];
+  for(let j=0; j<MAP_SIZE; j++) row.push({ type: TILE_NEUTRAL, city: null });
+  map.push(row);
 }
 
-// Starting tile in center
+// Starting player capital in center
 const startX = Math.floor(MAP_SIZE / 2);
 const startY = Math.floor(MAP_SIZE / 2);
-map[startY][startX] = 1;
 
-// Viewport position (top-left tile coords)
-let viewX = startX - Math.floor(VIEW_SIZE / 2);
-let viewY = startY - Math.floor(VIEW_SIZE / 2);
+// Initialize player's capital tile
+map[startY][startX].type = TILE_PLAYER_CAPITAL;
+map[startY][startX].city = {
+  name: 'Capital',
+  gold: 100,
+  armies: 0,
+  buildingBarracks: true,
+  trainingQueue: 0
+};
+
+// Create a few nearby player cities
+const nearbyCities = [
+  [startX+1, startY],
+  [startX, startY+1],
+  [startX-1, startY],
+];
+nearbyCities.forEach(([x,y],i) => {
+  if(x >= 0 && x < MAP_SIZE && y >= 0 && y < MAP_SIZE) {
+    map[y][x].type = TILE_PLAYER_CITY;
+    map[y][x].city = {
+      name: `City ${i+1}`,
+      gold: 50,
+      armies: 0,
+      buildingBarracks: true,
+      trainingQueue: 0
+    };
+  }
+});
+
+// Viewport variables
+let viewX = startX - Math.floor(VIEW_SIZE/2);
+let viewY = startY - Math.floor(VIEW_SIZE/2);
 
 function clampViewport() {
   viewX = Math.max(0, Math.min(viewX, MAP_SIZE - VIEW_SIZE));
   viewY = Math.max(0, Math.min(viewY, MAP_SIZE - VIEW_SIZE));
 }
 
-// Player state
+clampViewport();
+
+// Player global state
 let turn = 1;
-let actionPoints = 3;
+let playerGold = 100;
 
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
   for(let y=0; y<VIEW_SIZE; y++) {
     for(let x=0; x<VIEW_SIZE; x++) {
-      const mapX = viewX + x;
-      const mapY = viewY + y;
-      const tile = map[mapY][mapX];
+      let mapX = viewX + x;
+      let mapY = viewY + y;
+      let tile = map[mapY][mapX];
 
-      // Tile color by ownership
-      let color;
-      if(tile === 0) color = '#444'; // neutral
-      else if(tile === 1) color = '#4caf50'; // player green
-      else if(tile === 2) color = '#f44336'; // enemy red
+      // Base tile color
+      let color = '#444';
+      switch(tile.type) {
+        case TILE_NEUTRAL: color = '#444'; break;
+        case TILE_PLAYER_CITY: color = '#4caf50'; break;
+        case TILE_PLAYER_CAPITAL: color = '#2e7d32'; break;
+        case TILE_NEUTRAL_CITY: color = '#888'; break;
+        case TILE_ENEMY_CAPITAL: color = '#b71c1c'; break;
+      }
 
       ctx.fillStyle = color;
       ctx.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
 
-      // Tile border
+      // Draw city details if present
+      if(tile.city) {
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 12px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(tile.city.armies, x * TILE_SIZE + TILE_SIZE/2, y * TILE_SIZE + TILE_SIZE - 5);
+      }
+
       ctx.strokeStyle = '#222';
       ctx.strokeRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
     }
@@ -63,6 +117,7 @@ function draw() {
 
 draw();
 
+// Handle keyboard panning
 window.addEventListener('keydown', e => {
   switch(e.key) {
     case 'ArrowUp':
@@ -90,11 +145,11 @@ window.addEventListener('keydown', e => {
   draw();
 });
 
+// Track selected city coords
+let selectedCityCoords = null;
+
+// Click handler for city selection and training
 canvas.addEventListener('click', e => {
-  if(actionPoints <= 0) {
-    alert('No action points left this turn!');
-    return;
-  }
   const rect = canvas.getBoundingClientRect();
   const clickX = e.clientX - rect.left;
   const clickY = e.clientY - rect.top;
@@ -107,31 +162,67 @@ canvas.addEventListener('click', e => {
 
   if(mapY < 0 || mapY >= MAP_SIZE || mapX < 0 || mapX >= MAP_SIZE) return;
 
-  if(map[mapY][mapX] === 0 && isAdjacentToPlayer(mapX, mapY)) {
-    map[mapY][mapX] = 1;
-    actionPoints--;
-    apInfo.textContent = `AP: ${actionPoints}`;
-    draw();
-  } else {
-    alert('Tile must be neutral and adjacent to your territory to capture.');
+  let tile = map[mapY][mapX];
+
+  if(tile.city && (tile.type === TILE_PLAYER_CITY || tile.type === TILE_PLAYER_CAPITAL)) {
+    selectedCityCoords = [mapX, mapY];
+    showCityDetails(tile.city);
   }
 });
 
-function isAdjacentToPlayer(x, y) {
-  const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
-  for(let [dx, dy] of dirs) {
-    let nx = x + dx, ny = y + dy;
-    if(nx >= 0 && nx < MAP_SIZE && ny >= 0 && ny < MAP_SIZE) {
-      if(map[ny][nx] === 1) return true;
+function showCityDetails(city) {
+  cityDetails.innerHTML = `
+    <div class="city-info">
+      <strong>${city.name}</strong><br>
+      Gold: ${city.gold}<br>
+      Armies: ${city.armies}<br>
+      Barracks: ${city.buildingBarracks ? 'Built' : 'None'}<br>
+      <label>Train Soldiers: 
+        <input id="trainCount" type="number" min="0" max="${city.gold}" value="0" />
+      </label>
+      <button id="trainBtn">Train</button>
+    </div>
+  `;
+
+  const trainBtn = document.getElementById('trainBtn');
+  const trainCountInput = document.getElementById('trainCount');
+
+  trainBtn.addEventListener('click', () => {
+    const count = parseInt(trainCountInput.value);
+    if(isNaN(count) || count <= 0) {
+      alert('Enter a valid number of soldiers to train.');
+      return;
     }
-  }
-  return false;
+    const cost = count * 10; // each soldier costs 10 gold
+    if(cost > city.gold) {
+      alert('Not enough gold.');
+      return;
+    }
+    city.gold -= cost;
+    city.armies += count;
+    cityDetails.querySelector('div.city-info').remove();
+    showCityDetails(city);
+    draw();
+  });
 }
 
+// End turn: gain gold per city, train armies in queue (not implemented yet), next turn
 endTurnBtn.addEventListener('click', () => {
   turn++;
   turnInfo.textContent = `Turn: ${turn}`;
-  actionPoints = 3;
-  apInfo.textContent = `AP: ${actionPoints}`;
-  alert('Turn ended. AP reset.');
+
+  // Gain gold: +10 per city
+  let totalGoldGain = 0;
+  for(let y=0; y<MAP_SIZE; y++) {
+    for(let x=0; x<MAP_SIZE; x++) {
+      let tile = map[y][x];
+      if(tile.city && (tile.type === TILE_PLAYER_CITY || tile.type === TILE_PLAYER_CAPITAL)) {
+        tile.city.gold += 10;
+        totalGoldGain += 10;
+      }
+    }
+  }
+  goldInfo.textContent = `Gold: ${totalGoldGain} gained`;
+
+  draw();
 });
